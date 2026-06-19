@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Play, FileText, Edit2, Trash2, Plus, QrCode, Phone, Zap, MonitorSmartphone, MessageCircle } from 'lucide-vue-next'
+import { Play, FileText, Edit2, Trash2, Plus, QrCode, Phone, Zap, MonitorSmartphone, MessageCircle, CheckCircle2 } from 'lucide-vue-next'
 import { listAccounts, deleteAccount, checkAccountsStatus } from '../lib/api'
 import { useI18n } from '../composables/useI18n'
 import AddAccountModal from '../components/accounts/AddAccountModal.vue'
@@ -102,6 +102,7 @@ const handleDelete = async (name: string) => {
 }
 
 const checkingAccount = ref('')
+const batchChecking = ref(false)
 
 const handleCheck = async (name: string) => {
   const token = localStorage.getItem('tg-signer-token') || ''
@@ -122,6 +123,31 @@ const handleCheck = async (name: string) => {
     alert(t('accounts.checkFailed'))
   } finally {
     checkingAccount.value = ''
+  }
+}
+
+const handleBatchCheck = async () => {
+  const token = localStorage.getItem('tg-signer-token') || ''
+  const names = accounts.value.map(acc => acc.name).filter(Boolean)
+  if (!token || names.length === 0) return
+
+  batchChecking.value = true
+  try {
+    const res = await checkAccountsStatus(token, { account_names: names, timeout_seconds: 8 })
+    await loadAccounts()
+    const ok = res.results.filter(item => item.ok).length
+    const failed = res.results.length - ok
+    const failedLines = res.results
+      .filter(item => !item.ok)
+      .slice(0, 8)
+      .map(item => `- ${item.account_name}: ${item.message || item.code || t('accounts.loginExpired')}`)
+      .join('\n')
+    const more = failed > 8 ? `\n... +${failed - 8}` : ''
+    alert(`✅ ${t('accounts.batchCheckDone')}\n${t('accounts.checkOkCount')}: ${ok}\n${t('accounts.checkFailedCount')}: ${failed}${failedLines ? `\n\n${failedLines}${more}` : ''}`)
+  } catch (e) {
+    alert(t('accounts.checkFailed'))
+  } finally {
+    batchChecking.value = false
   }
 }
 
@@ -181,7 +207,22 @@ const goTasks = (name: string) => {
       <p class="text-xs text-gray-500">{{ t('accounts.emptyHint') }}</p>
     </div>
 
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-20">
+    <div v-else class="space-y-4 pb-20">
+      <div class="flex items-center justify-between gap-3 p-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800/60">
+        <div class="text-xs text-gray-500">
+          {{ t('accounts.total') }}：{{ accounts.length }}
+        </div>
+        <button
+          @click="handleBatchCheck"
+          :disabled="batchChecking"
+          class="inline-flex items-center gap-2 px-3 py-2 text-xs bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-950 hover:bg-gray-800 dark:hover:bg-white transition-colors disabled:opacity-50"
+        >
+          <svg v-if="batchChecking" class="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+          <CheckCircle2 v-else class="w-3.5 h-3.5" />
+          {{ batchChecking ? t('accounts.batchChecking') : t('accounts.batchCheck') }}
+        </button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
     <div 
       v-for="acc in accounts" :key="acc.id"
       class="group relative flex flex-col p-5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800/60 hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
@@ -251,6 +292,7 @@ const goTasks = (name: string) => {
           <span class="text-[10px]">{{ t('accounts.deleteBtn') }}</span>
         </button>
       </div>
+    </div>
     </div>
     </div>
     
