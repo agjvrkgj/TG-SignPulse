@@ -322,7 +322,7 @@ async def init_scheduler(sync_on_startup: bool = True) -> AsyncIOScheduler:
 
         scheduler.add_job(
             _job_device_monitor,
-            trigger=CronTrigger.from_crontab("0 4 * * *"),
+            trigger=CronTrigger.from_crontab("0 7 * * *"),
             id="system-device-monitor",
             replace_existing=True,
         )
