@@ -232,6 +232,13 @@ export interface AccountDeviceInfo {
   region: string;
 }
 
+export interface OfficialMessageInfo {
+  id?: number | null;
+  date?: string | null;
+  text: string;
+  outgoing: boolean;
+}
+
 export const startAccountLogin = (token: string, data: LoginStartRequest) =>
   request<LoginStartResponse>("/accounts/login/start", {
     method: "POST",
@@ -260,6 +267,9 @@ export const terminateAccountDevice = (token: string, accountName: string, authH
   request<{ success: boolean; message: string }>(`/accounts/${encodeURIComponent(accountName)}/devices/${encodeURIComponent(authHash)}`, {
     method: "DELETE",
   }, token);
+
+export const listAccountOfficialMessages = (token: string, accountName: string, limit = 20) =>
+  request<{ messages: OfficialMessageInfo[]; total: number }>(`/accounts/${encodeURIComponent(accountName)}/official-messages?limit=${encodeURIComponent(String(limit))}`, {}, token);
 
 export const deleteAccount = (token: string, accountName: string) =>
   request<{ success: boolean; message: string }>(`/accounts/${accountName}`, {

@@ -794,6 +794,80 @@ class TelegramService:
             )
         return bool(result)
 
+    async def list_official_messages(
+        self,
+        account_name: str,
+        limit: int = 20,
+        timeout_seconds: float = 12.0,
+    ) -> List[Dict[str, Any]]:
+        """读取账号与 Telegram 官方服务号 777000 的最近消息。"""
+        from tg_signer.core import get_client
+
+        account_name = self._normalize_account_name(account_name)
+        if not self.account_exists(account_name):
+            raise ValueError("账号不存在")
+
+        proxy_dict = None
+        try:
+            profile = get_account_profile(account_name) or {}
+            proxy_value = profile.get("proxy")
+            if not proxy_value:
+                from backend.services.config import get_config_service
+
+                proxy_value = get_config_service().get_global_settings().get(
+                    "global_proxy"
+                )
+            if proxy_value:
+                proxy_dict = build_proxy_dict(proxy_value)
+        except Exception:
+            proxy_dict = None
+
+        session_mode = get_session_mode()
+        session_string = None
+        in_memory = False
+        if session_mode == "string":
+            session_string = get_account_session_string(
+                account_name
+            ) or load_session_string_file(self.session_dir, account_name)
+            if not session_string:
+                raise ValueError("session_string 不存在或已失效")
+            in_memory = True
+
+        client = get_client(
+            account_name,
+            proxy=proxy_dict,
+            workdir=self.session_dir,
+            session_string=session_string,
+            in_memory=in_memory,
+            no_updates=True,
+        )
+
+        limit = max(1, min(int(limit or 20), 50))
+        timeout_seconds = max(1.0, min(float(timeout_seconds or 12.0), 30.0))
+        lock = get_account_lock(account_name)
+
+        async def _read_messages() -> List[Dict[str, Any]]:
+            if not getattr(client, "is_connected", False):
+                await client.connect()
+
+            messages: List[Dict[str, Any]] = []
+            async for msg in client.get_chat_history(777000, limit=limit):
+                text = getattr(msg, "text", None) or getattr(msg, "caption", None) or ""
+                messages.append(
+                    {
+                        "id": getattr(msg, "id", None),
+                        "date": msg.date.isoformat().replace("+00:00", "Z")
+                        if getattr(msg, "date", None)
+                        else None,
+                        "text": text,
+                        "outgoing": bool(getattr(msg, "outgoing", False)),
+                    }
+                )
+            return messages
+
+        async with lock:
+            return await asyncio.wait_for(_read_messages(), timeout=timeout_seconds)
+
     async def delete_account(self, account_name: str) -> bool:
         """
         删除账号（删除 session 文件）

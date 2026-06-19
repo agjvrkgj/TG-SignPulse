@@ -245,6 +245,18 @@ class TerminateDeviceResponse(BaseModel):
     message: str
 
 
+class OfficialMessageItem(BaseModel):
+    id: Optional[int] = None
+    date: Optional[str] = None
+    text: str = ""
+    outgoing: bool = False
+
+
+class OfficialMessagesResponse(BaseModel):
+    messages: list[OfficialMessageItem]
+    total: int
+
+
 # ============ API Routes ============
 
 
@@ -672,6 +684,30 @@ async def terminate_account_device(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"设备下线失败: {str(e)}",
+        )
+
+
+@router.get("/{account_name}/official-messages", response_model=OfficialMessagesResponse)
+async def list_account_official_messages(
+    account_name: str,
+    limit: int = 20,
+    current_user: User = Depends(get_current_user),
+):
+    """读取账号和 Telegram 官方服务号 777000 的最近消息。"""
+    try:
+        messages = await get_telegram_service().list_official_messages(
+            account_name, limit=limit
+        )
+        return OfficialMessagesResponse(
+            messages=[OfficialMessageItem(**item) for item in messages],
+            total=len(messages),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取官方消息失败: {str(e)}",
         )
 
 

@@ -56,6 +56,15 @@ const messages: Record<string, Record<string, string>> = {
     'accounts.terminateDevice': '下线',
     'accounts.terminateDeviceConfirm': '确定要踢下线这个设备吗？',
     'accounts.terminateDeviceFailed': '设备下线失败',
+    'accounts.officialMessages': 'Telegram 官方消息',
+    'accounts.officialMessagesShort': '官方',
+    'accounts.officialMessagesHintTitle': '只读取 Telegram 官方服务号 777000',
+    'accounts.officialMessagesHint': '这里可以查看 Telegram 登录验证码和安全通知。不会发送消息，也不会修改会话。',
+    'accounts.officialMessagesFailed': '加载官方消息失败',
+    'accounts.loadingOfficialMessages': '正在读取官方消息...',
+    'accounts.noOfficialMessages': '暂无官方消息',
+    'accounts.emptyMessage': '空消息',
+    'accounts.refresh': '刷新',
 
     // Tasks
     'tasks.empty': '还没有任务',
@@ -434,6 +443,15 @@ const messages: Record<string, Record<string, string>> = {
     'accounts.terminateDevice': 'Terminate',
     'accounts.terminateDeviceConfirm': 'Terminate this device session?',
     'accounts.terminateDeviceFailed': 'Failed to terminate device',
+    'accounts.officialMessages': 'Telegram Official Messages',
+    'accounts.officialMessagesShort': 'Official',
+    'accounts.officialMessagesHintTitle': 'Only reads Telegram official service chat 777000',
+    'accounts.officialMessagesHint': 'Use this to view Telegram login codes and security notifications. It does not send messages or modify the session.',
+    'accounts.officialMessagesFailed': 'Failed to load official messages',
+    'accounts.loadingOfficialMessages': 'Loading official messages...',
+    'accounts.noOfficialMessages': 'No official messages',
+    'accounts.emptyMessage': 'Empty message',
+    'accounts.refresh': 'Refresh',
 
     // Tasks
     'tasks.empty': 'No tasks yet',
