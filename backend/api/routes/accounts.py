@@ -216,6 +216,35 @@ class AccountStatusCheckResponse(BaseModel):
     results: list[AccountStatusItem]
 
 
+class AccountDeviceItem(BaseModel):
+    """Telegram 已登录设备/授权会话"""
+
+    hash: str
+    current: bool = False
+    official_app: bool = False
+    password_pending: bool = False
+    device_model: str = ""
+    platform: str = ""
+    system_version: str = ""
+    app_name: str = ""
+    app_version: str = ""
+    date_created: Optional[str] = None
+    date_active: Optional[str] = None
+    ip: str = ""
+    country: str = ""
+    region: str = ""
+
+
+class AccountDevicesResponse(BaseModel):
+    devices: list[AccountDeviceItem]
+    total: int
+
+
+class TerminateDeviceResponse(BaseModel):
+    success: bool
+    message: str
+
+
 # ============ API Routes ============
 
 
@@ -600,6 +629,50 @@ def check_account_exists(
     """检查账号是否存在"""
     exists = get_telegram_service().account_exists(account_name)
     return {"exists": exists, "account_name": account_name}
+
+
+@router.get("/{account_name}/devices", response_model=AccountDevicesResponse)
+async def list_account_devices(
+    account_name: str, current_user: User = Depends(get_current_user)
+):
+    """获取账号已登录设备/授权会话列表。"""
+    try:
+        devices = await get_telegram_service().list_account_devices(account_name)
+        return AccountDevicesResponse(
+            devices=[AccountDeviceItem(**item) for item in devices],
+            total=len(devices),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取设备列表失败: {str(e)}",
+        )
+
+
+@router.delete("/{account_name}/devices/{auth_hash}", response_model=TerminateDeviceResponse)
+async def terminate_account_device(
+    account_name: str,
+    auth_hash: str,
+    current_user: User = Depends(get_current_user),
+):
+    """踢下线指定已登录设备。"""
+    try:
+        success = await get_telegram_service().terminate_account_device(
+            account_name, int(auth_hash)
+        )
+        return TerminateDeviceResponse(
+            success=success,
+            message="设备已下线" if success else "设备下线失败",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"设备下线失败: {str(e)}",
+        )
 
 
 @router.get("/{account_name}/avatar")

@@ -215,6 +215,23 @@ export interface AccountStatusCheckResponse {
   results: AccountStatusItem[];
 }
 
+export interface AccountDeviceInfo {
+  hash: string;
+  current: boolean;
+  official_app: boolean;
+  password_pending: boolean;
+  device_model: string;
+  platform: string;
+  system_version: string;
+  app_name: string;
+  app_version: string;
+  date_created?: string | null;
+  date_active?: string | null;
+  ip: string;
+  country: string;
+  region: string;
+}
+
 export const startAccountLogin = (token: string, data: LoginStartRequest) =>
   request<LoginStartResponse>("/accounts/login/start", {
     method: "POST",
@@ -234,6 +251,14 @@ export const checkAccountsStatus = (token: string, data: AccountStatusCheckReque
   request<AccountStatusCheckResponse>("/accounts/status/check", {
     method: "POST",
     body: JSON.stringify(data),
+  }, token);
+
+export const listAccountDevices = (token: string, accountName: string) =>
+  request<{ devices: AccountDeviceInfo[]; total: number }>(`/accounts/${encodeURIComponent(accountName)}/devices`, {}, token);
+
+export const terminateAccountDevice = (token: string, accountName: string, authHash: string) =>
+  request<{ success: boolean; message: string }>(`/accounts/${encodeURIComponent(accountName)}/devices/${encodeURIComponent(authHash)}`, {
+    method: "DELETE",
   }, token);
 
 export const deleteAccount = (token: string, accountName: string) =>
