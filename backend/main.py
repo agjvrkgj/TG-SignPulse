@@ -83,17 +83,17 @@ app.include_router(api_router, prefix="/api")
 
 
 @app.get("/health")
-def health_check() -> dict[str, str]:
+async def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 
 @app.get("/healthz")
-def health_checkz() -> dict[str, str]:
+async def health_checkz() -> dict[str, str]:
     return {"status": "ok"}
 
 
 @app.get("/readyz")
-def ready_check(response: Response) -> dict[str, str]:
+async def ready_check(response: Response) -> dict[str, str]:
     if app.state.ready:
         return {"status": "ready"}
     response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
