@@ -527,6 +527,7 @@ export interface GlobalSettings {
   tg_global_concurrency?: number | null;
   device_keepalive_enabled?: boolean;
   device_keepalive_interval_days?: number;
+  device_change_detection_enabled?: boolean;
   telegram_bot_notify_enabled?: boolean;
   telegram_bot_login_notify_enabled?: boolean;
   telegram_bot_task_failure_enabled?: boolean;
@@ -570,6 +571,34 @@ export const getDeviceKeepaliveState = (token: string) =>
 
 export const runDeviceKeepalive = (token: string) =>
   request<DeviceKeepaliveRunResult>("/config/settings/device-keepalive/run", {
+    method: "POST",
+  }, token);
+
+export interface DeviceMonitorRunResult {
+  success: boolean;
+  enabled: boolean;
+  checked: number;
+  new_devices: number;
+  failed: number;
+  baseline_only: boolean;
+  results: Array<{ account_name: string; status: string; devices?: number; new_devices?: number; baseline?: boolean; message?: string }>;
+}
+
+export interface DeviceMonitorState {
+  last_scan_at?: string | null;
+  accounts: Array<{
+    account_name: string;
+    last_scan_at?: string | null;
+    last_error?: string | null;
+    device_count: number;
+  }>;
+}
+
+export const getDeviceMonitorState = (token: string) =>
+  request<DeviceMonitorState>("/config/settings/device-monitor/state", undefined, token);
+
+export const runDeviceMonitor = (token: string) =>
+  request<DeviceMonitorRunResult>("/config/settings/device-monitor/run", {
     method: "POST",
   }, token);
 

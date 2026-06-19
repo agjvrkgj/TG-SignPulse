@@ -368,6 +368,7 @@ class GlobalSettingsRequest(BaseModel):
     tg_global_concurrency: Optional[int] = None
     device_keepalive_enabled: bool = True
     device_keepalive_interval_days: int = 30
+    device_change_detection_enabled: bool = True
     telegram_bot_notify_enabled: bool = False
     telegram_bot_login_notify_enabled: bool = False
     telegram_bot_task_failure_enabled: bool = True
@@ -384,6 +385,7 @@ class GlobalSettingsResponse(BaseModel):
     tg_global_concurrency: Optional[int] = 1
     device_keepalive_enabled: bool = True
     device_keepalive_interval_days: int = 30
+    device_change_detection_enabled: bool = True
     telegram_bot_notify_enabled: bool = False
     telegram_bot_login_notify_enabled: bool = False
     telegram_bot_task_failure_enabled: bool = True
@@ -418,6 +420,7 @@ async def save_global_settings(
             "device_keepalive_interval_days": max(
                 1, min(int(request.device_keepalive_interval_days or 30), 170)
             ),
+            "device_change_detection_enabled": request.device_change_detection_enabled,
             "telegram_bot_notify_enabled": request.telegram_bot_notify_enabled,
             "telegram_bot_login_notify_enabled": request.telegram_bot_login_notify_enabled,
             "telegram_bot_task_failure_enabled": request.telegram_bot_task_failure_enabled,
@@ -485,6 +488,50 @@ async def run_device_keepalive(current_user: User = Depends(get_current_user)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"设备保活失败: {str(e)}",
+        )
+
+
+class DeviceMonitorResponse(BaseModel):
+    success: bool
+    enabled: bool = True
+    checked: int = 0
+    new_devices: int = 0
+    failed: int = 0
+    baseline_only: bool = False
+    results: list[dict] = []
+
+
+class DeviceMonitorStateResponse(BaseModel):
+    last_scan_at: Optional[str] = None
+    accounts: list[dict] = []
+
+
+@router.get("/settings/device-monitor/state", response_model=DeviceMonitorStateResponse)
+async def get_device_monitor_state(current_user: User = Depends(get_current_user)):
+    """读取设备新增检测记录。"""
+    try:
+        from backend.services.device_monitor import get_device_monitor_service
+
+        return DeviceMonitorStateResponse(**get_device_monitor_service().get_state())
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"读取设备检测记录失败: {str(e)}",
+        )
+
+
+@router.post("/settings/device-monitor/run", response_model=DeviceMonitorResponse)
+async def run_device_monitor(current_user: User = Depends(get_current_user)):
+    """立即执行一次授权设备新增检测。"""
+    try:
+        from backend.services.device_monitor import get_device_monitor_service
+
+        result = await get_device_monitor_service().scan(force_notify=True)
+        return DeviceMonitorResponse(**result)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"设备检测失败: {str(e)}",
         )
 
 

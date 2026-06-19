@@ -177,6 +177,26 @@ async def _job_device_keepalive() -> None:
         logger.error("Device keepalive job failed: %s", exc, exc_info=True)
 
 
+async def _job_device_monitor() -> None:
+    """定期检测 Telegram 授权设备是否新增，并通过 Bot 通知。"""
+    import logging
+
+    logger = logging.getLogger("backend.scheduler")
+    try:
+        from backend.services.device_monitor import get_device_monitor_service
+
+        result = await get_device_monitor_service().scan()
+        logger.info(
+            "Device monitor finished: checked=%s new=%s failed=%s baseline=%s",
+            result.get("checked"),
+            result.get("new_devices"),
+            result.get("failed"),
+            result.get("baseline_only"),
+        )
+    except Exception as exc:
+        logger.error("Device monitor job failed: %s", exc, exc_info=True)
+
+
 async def sync_jobs() -> None:
     """
     Sync APScheduler jobs from DB tasks table and file-based sign tasks.
@@ -297,6 +317,13 @@ async def init_scheduler(sync_on_startup: bool = True) -> AsyncIOScheduler:
             _job_device_keepalive,
             trigger=CronTrigger.from_crontab("30 3 * * *"),
             id="system-device-keepalive",
+            replace_existing=True,
+        )
+
+        scheduler.add_job(
+            _job_device_monitor,
+            trigger=CronTrigger.from_crontab("0 4 * * *"),
+            id="system-device-monitor",
             replace_existing=True,
         )
 

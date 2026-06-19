@@ -611,6 +611,7 @@ class ConfigService:
             "tg_global_concurrency": 1,
             "device_keepalive_enabled": True,
             "device_keepalive_interval_days": 30,
+            "device_change_detection_enabled": True,
             "telegram_bot_notify_enabled": False,
             "telegram_bot_login_notify_enabled": False,
             "telegram_bot_task_failure_enabled": True,

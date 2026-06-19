@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { getGlobalSettings, saveGlobalSettings, getTelegramConfig, saveTelegramConfig, resetTelegramConfig, getAIConfig, saveAIConfig, testAIConnection, exportAllConfigs, importAllConfigs, getDeviceKeepaliveState, runDeviceKeepalive } from '../lib/api'
+import { getGlobalSettings, saveGlobalSettings, getTelegramConfig, saveTelegramConfig, resetTelegramConfig, getAIConfig, saveAIConfig, testAIConnection, exportAllConfigs, importAllConfigs, getDeviceKeepaliveState, runDeviceKeepalive, getDeviceMonitorState, runDeviceMonitor } from '../lib/api'
 import { useI18n } from '../composables/useI18n'
 
 const { t } = useI18n()
@@ -13,6 +13,7 @@ const settings = ref({
   concurrency: 1,
   deviceKeepaliveEnabled: true,
   deviceKeepaliveIntervalDays: 30,
+  deviceChangeDetectionEnabled: true,
   botEnabled: false,
   botLoginNotify: false,
   botTaskFailure: false,
@@ -60,6 +61,7 @@ onMounted(async () => {
     settings.value.concurrency = res.tg_global_concurrency || 1
     settings.value.deviceKeepaliveEnabled = res.device_keepalive_enabled !== false
     settings.value.deviceKeepaliveIntervalDays = res.device_keepalive_interval_days || 30
+    settings.value.deviceChangeDetectionEnabled = res.device_change_detection_enabled !== false
     settings.value.botEnabled = res.telegram_bot_notify_enabled || false
     settings.value.botLoginNotify = res.telegram_bot_login_notify_enabled || false
     settings.value.botTaskFailure = res.telegram_bot_task_failure_enabled || false
@@ -77,7 +79,7 @@ onMounted(async () => {
       aiConfig.value.model = aiRes.model || ''
     }
 
-    await loadKeepaliveState()
+    await Promise.all([loadKeepaliveState(), loadDeviceMonitorState()])
 
   } catch (e) {
     console.error('Failed to load settings', e)
@@ -98,6 +100,7 @@ const saveSettings = async () => {
       tg_global_concurrency: settings.value.concurrency || 1,
       device_keepalive_enabled: settings.value.deviceKeepaliveEnabled,
       device_keepalive_interval_days: settings.value.deviceKeepaliveIntervalDays || 30,
+      device_change_detection_enabled: settings.value.deviceChangeDetectionEnabled,
     })
     showToast(t('settings.saveSuccess'))
   } catch (e: any) {
@@ -109,7 +112,9 @@ const saveSettings = async () => {
 
 const botLoading = ref(false)
 const keepaliveLoading = ref(false)
+const deviceMonitorLoading = ref(false)
 const keepaliveState = ref<{ last_run_at?: string | null; accounts: Array<{ account_name: string; last_ok_at?: string | null; last_attempt_at?: string | null; last_error?: string | null }> }>({ accounts: [] })
+const deviceMonitorState = ref<{ last_scan_at?: string | null; accounts: Array<{ account_name: string; last_scan_at?: string | null; last_error?: string | null; device_count: number }> }>({ accounts: [] })
 
 const loadKeepaliveState = async () => {
   const token = localStorage.getItem('tg-signer-token') || ''
@@ -144,6 +149,34 @@ const runKeepaliveNow = async () => {
     showToast(e.message || t('settings.keepaliveFailed'))
   } finally {
     keepaliveLoading.value = false
+  }
+}
+
+const loadDeviceMonitorState = async () => {
+  const token = localStorage.getItem('tg-signer-token') || ''
+  if (!token) return
+
+  try {
+    deviceMonitorState.value = await getDeviceMonitorState(token)
+  } catch {
+    // 设备检测记录不是关键数据，读取失败不打断设置页
+  }
+}
+
+const runDeviceMonitorNow = async () => {
+  const token = localStorage.getItem('tg-signer-token') || ''
+  if (!token) return
+
+  deviceMonitorLoading.value = true
+  try {
+    const res = await runDeviceMonitor(token)
+    await loadDeviceMonitorState()
+    const baselineText = res.baseline_only ? `，${t('settings.deviceMonitorBaseline')}` : ''
+    showToast(`${t('settings.deviceMonitorDone')}：${t('settings.newDevices')} ${res.new_devices}，${t('settings.failed')} ${res.failed}${baselineText}`)
+  } catch (e: any) {
+    showToast(e.message || t('settings.deviceMonitorFailed'))
+  } finally {
+    deviceMonitorLoading.value = false
   }
 }
 
@@ -342,6 +375,47 @@ const handleImport = async (e: Event) => {
                   </div>
                 </div>
                 <p v-else class="text-[10px] text-gray-500">{{ t('settings.keepaliveNoRecords') }}</p>
+              </div>
+            </div>
+            <div class="p-3 bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800/60 space-y-3">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <label class="text-xs text-gray-600 dark:text-gray-300 block">{{ t('settings.deviceMonitor') }}</label>
+                  <p class="text-[10px] text-gray-500 mt-1">{{ t('settings.deviceMonitorDesc') }}</p>
+                </div>
+                <button
+                  @click="settings.deviceChangeDetectionEnabled = !settings.deviceChangeDetectionEnabled"
+                  class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none"
+                  :class="settings.deviceChangeDetectionEnabled ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-700'"
+                >
+                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform" :class="settings.deviceChangeDetectionEnabled ? 'translate-x-4' : 'translate-x-1'" />
+                </button>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+                <div class="text-[10px] text-gray-500 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800/60 px-3 py-2">
+                  {{ t('settings.deviceMonitorSchedule') }}
+                </div>
+                <button @click="runDeviceMonitorNow" :disabled="deviceMonitorLoading" class="px-3 py-2 text-xs text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50">
+                  {{ deviceMonitorLoading ? t('settings.processing') : t('settings.deviceMonitorNow') }}
+                </button>
+              </div>
+              <div class="border-t border-gray-200 dark:border-gray-800/60 pt-3 space-y-2">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-[10px] text-gray-500">{{ t('settings.deviceMonitorLastScan') }}：{{ formatKeepaliveTime(deviceMonitorState.last_scan_at) }}</span>
+                  <button @click="loadDeviceMonitorState" class="text-[10px] text-blue-500 hover:text-blue-600 dark:hover:text-blue-400">{{ t('settings.refresh') }}</button>
+                </div>
+                <div v-if="deviceMonitorState.accounts.length" class="max-h-36 overflow-auto space-y-1">
+                  <div v-for="item in deviceMonitorState.accounts" :key="item.account_name" class="flex items-start justify-between gap-3 text-[10px] bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800/60 px-2 py-1.5">
+                    <div class="min-w-0">
+                      <div class="text-gray-700 dark:text-gray-200 truncate">{{ item.account_name }}</div>
+                      <div class="text-gray-500">{{ t('settings.deviceCount') }}：{{ item.device_count }} · {{ t('settings.lastScan') }}：{{ formatKeepaliveTime(item.last_scan_at) }}</div>
+                    </div>
+                    <div class="text-right shrink-0 max-w-32 truncate" :class="item.last_error ? 'text-red-500' : 'text-emerald-500'">
+                      {{ item.last_error || 'OK' }}
+                    </div>
+                  </div>
+                </div>
+                <p v-else class="text-[10px] text-gray-500">{{ t('settings.deviceMonitorNoRecords') }}</p>
               </div>
             </div>
             <div class="pt-2">
