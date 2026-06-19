@@ -555,6 +555,19 @@ export interface DeviceKeepaliveRunResult {
   results: Array<{ account_name: string; status: string; message?: string }>;
 }
 
+export interface DeviceKeepaliveState {
+  last_run_at?: string | null;
+  accounts: Array<{
+    account_name: string;
+    last_ok_at?: string | null;
+    last_attempt_at?: string | null;
+    last_error?: string | null;
+  }>;
+}
+
+export const getDeviceKeepaliveState = (token: string) =>
+  request<DeviceKeepaliveState>("/config/settings/device-keepalive/state", undefined, token);
+
 export const runDeviceKeepalive = (token: string) =>
   request<DeviceKeepaliveRunResult>("/config/settings/device-keepalive/run", {
     method: "POST",

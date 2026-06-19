@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { getGlobalSettings, saveGlobalSettings, getTelegramConfig, saveTelegramConfig, resetTelegramConfig, getAIConfig, saveAIConfig, testAIConnection, exportAllConfigs, importAllConfigs, runDeviceKeepalive } from '../lib/api'
+import { getGlobalSettings, saveGlobalSettings, getTelegramConfig, saveTelegramConfig, resetTelegramConfig, getAIConfig, saveAIConfig, testAIConnection, exportAllConfigs, importAllConfigs, getDeviceKeepaliveState, runDeviceKeepalive } from '../lib/api'
 import { useI18n } from '../composables/useI18n'
 
 const { t } = useI18n()
@@ -77,6 +77,8 @@ onMounted(async () => {
       aiConfig.value.model = aiRes.model || ''
     }
 
+    await loadKeepaliveState()
+
   } catch (e) {
     console.error('Failed to load settings', e)
   }
@@ -107,6 +109,27 @@ const saveSettings = async () => {
 
 const botLoading = ref(false)
 const keepaliveLoading = ref(false)
+const keepaliveState = ref<{ last_run_at?: string | null; accounts: Array<{ account_name: string; last_ok_at?: string | null; last_attempt_at?: string | null; last_error?: string | null }> }>({ accounts: [] })
+
+const loadKeepaliveState = async () => {
+  const token = localStorage.getItem('tg-signer-token') || ''
+  if (!token) return
+
+  try {
+    keepaliveState.value = await getDeviceKeepaliveState(token)
+  } catch {
+    // 保活记录不是关键数据，读取失败不打断设置页
+  }
+}
+
+const formatKeepaliveTime = (value?: string | null) => {
+  if (!value) return t('settings.never')
+  try {
+    return new Date(value).toLocaleString()
+  } catch {
+    return value
+  }
+}
 
 const runKeepaliveNow = async () => {
   const token = localStorage.getItem('tg-signer-token') || ''
@@ -115,6 +138,7 @@ const runKeepaliveNow = async () => {
   keepaliveLoading.value = true
   try {
     const res = await runDeviceKeepalive(token)
+    await loadKeepaliveState()
     showToast(`${t('settings.keepaliveDone')}：${res.kept_alive}/${res.checked}，${t('settings.failed')} ${res.failed}`)
   } catch (e: any) {
     showToast(e.message || t('settings.keepaliveFailed'))
@@ -301,6 +325,24 @@ const handleImport = async (e: Event) => {
                 </button>
               </div>
               <p class="text-[10px] text-gray-500">{{ t('settings.deviceKeepaliveIntervalHint') }}</p>
+              <div class="border-t border-gray-200 dark:border-gray-800/60 pt-3 space-y-2">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-[10px] text-gray-500">{{ t('settings.keepaliveLastRun') }}：{{ formatKeepaliveTime(keepaliveState.last_run_at) }}</span>
+                  <button @click="loadKeepaliveState" class="text-[10px] text-blue-500 hover:text-blue-600 dark:hover:text-blue-400">{{ t('settings.refresh') }}</button>
+                </div>
+                <div v-if="keepaliveState.accounts.length" class="max-h-36 overflow-auto space-y-1">
+                  <div v-for="item in keepaliveState.accounts" :key="item.account_name" class="flex items-start justify-between gap-3 text-[10px] bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800/60 px-2 py-1.5">
+                    <div class="min-w-0">
+                      <div class="text-gray-700 dark:text-gray-200 truncate">{{ item.account_name }}</div>
+                      <div class="text-gray-500">{{ t('settings.keepaliveLastOk') }}：{{ formatKeepaliveTime(item.last_ok_at) }}</div>
+                    </div>
+                    <div class="text-right shrink-0 max-w-32 truncate" :class="item.last_error ? 'text-red-500' : 'text-emerald-500'">
+                      {{ item.last_error || 'OK' }}
+                    </div>
+                  </div>
+                </div>
+                <p v-else class="text-[10px] text-gray-500">{{ t('settings.keepaliveNoRecords') }}</p>
+              </div>
             </div>
             <div class="pt-2">
               <button @click="saveSettings" :disabled="loading" class="w-full py-2 text-sm bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-950 hover:bg-gray-800 dark:hover:bg-white transition-colors disabled:opacity-50">{{ loading ? t('settings.saving') : t('settings.saveGeneral') }}</button>

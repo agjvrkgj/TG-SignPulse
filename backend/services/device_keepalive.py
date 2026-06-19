@@ -45,6 +45,25 @@ class DeviceKeepaliveService:
         except OSError as exc:
             logger.warning("Failed to save device keepalive state: %s", exc)
 
+    def get_state(self) -> Dict[str, Any]:
+        """Return keepalive state in a frontend-friendly shape."""
+        state = self._load_state()
+        accounts = state.get("accounts")
+        if not isinstance(accounts, dict):
+            accounts = {}
+        return {
+            "last_run_at": state.get("last_run_at"),
+            "accounts": [
+                {
+                    "account_name": account_name,
+                    "last_ok_at": info.get("last_ok_at") if isinstance(info, dict) else None,
+                    "last_attempt_at": info.get("last_attempt_at") if isinstance(info, dict) else None,
+                    "last_error": info.get("last_error") if isinstance(info, dict) else None,
+                }
+                for account_name, info in sorted(accounts.items())
+            ],
+        }
+
     @staticmethod
     def _parse_time(value: Any) -> datetime | None:
         if not value:

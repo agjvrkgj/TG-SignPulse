@@ -454,6 +454,25 @@ class DeviceKeepaliveResponse(BaseModel):
     results: list[dict] = []
 
 
+class DeviceKeepaliveStateResponse(BaseModel):
+    last_run_at: Optional[str] = None
+    accounts: list[dict] = []
+
+
+@router.get("/settings/device-keepalive/state", response_model=DeviceKeepaliveStateResponse)
+async def get_device_keepalive_state(current_user: User = Depends(get_current_user)):
+    """读取设备保活记录。"""
+    try:
+        from backend.services.device_keepalive import get_device_keepalive_service
+
+        return DeviceKeepaliveStateResponse(**get_device_keepalive_service().get_state())
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"读取设备保活记录失败: {str(e)}",
+        )
+
+
 @router.post("/settings/device-keepalive/run", response_model=DeviceKeepaliveResponse)
 async def run_device_keepalive(current_user: User = Depends(get_current_user)):
     """立即执行一次设备保活。"""
