@@ -609,6 +609,8 @@ class ConfigService:
             "data_dir": str(override_data_dir) if override_data_dir else None,
             "global_proxy": None,
             "tg_global_concurrency": 1,
+            "device_keepalive_enabled": True,
+            "device_keepalive_interval_days": 30,
             "telegram_bot_notify_enabled": False,
             "telegram_bot_login_notify_enabled": False,
             "telegram_bot_task_failure_enabled": True,

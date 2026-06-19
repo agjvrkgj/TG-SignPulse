@@ -525,6 +525,8 @@ export interface GlobalSettings {
   data_dir?: string | null;
   global_proxy?: string | null;
   tg_global_concurrency?: number | null;
+  device_keepalive_enabled?: boolean;
+  device_keepalive_interval_days?: number;
   telegram_bot_notify_enabled?: boolean;
   telegram_bot_login_notify_enabled?: boolean;
   telegram_bot_task_failure_enabled?: boolean;
@@ -540,6 +542,22 @@ export const saveGlobalSettings = (token: string, settings: GlobalSettings) =>
   request<{ success: boolean; message: string }>("/config/settings", {
     method: "POST",
     body: JSON.stringify(settings),
+  }, token);
+
+export interface DeviceKeepaliveRunResult {
+  success: boolean;
+  enabled: boolean;
+  checked: number;
+  kept_alive: number;
+  skipped: number;
+  failed: number;
+  interval_days?: number | null;
+  results: Array<{ account_name: string; status: string; message?: string }>;
+}
+
+export const runDeviceKeepalive = (token: string) =>
+  request<DeviceKeepaliveRunResult>("/config/settings/device-keepalive/run", {
+    method: "POST",
   }, token);
 
 // ============ Telegram API 配置 ============

@@ -157,6 +157,26 @@ async def _job_maintenance() -> None:
         db.close()
 
 
+async def _job_device_keepalive() -> None:
+    """定期保活 Telegram 授权设备/会话，避免长期不活跃被自动踢下线。"""
+    import logging
+
+    logger = logging.getLogger("backend.scheduler")
+    try:
+        from backend.services.device_keepalive import get_device_keepalive_service
+
+        result = await get_device_keepalive_service().run_due()
+        logger.info(
+            "Device keepalive finished: checked=%s ok=%s skipped=%s failed=%s",
+            result.get("checked"),
+            result.get("kept_alive"),
+            result.get("skipped"),
+            result.get("failed"),
+        )
+    except Exception as exc:
+        logger.error("Device keepalive job failed: %s", exc, exc_info=True)
+
+
 async def sync_jobs() -> None:
     """
     Sync APScheduler jobs from DB tasks table and file-based sign tasks.
@@ -270,6 +290,13 @@ async def init_scheduler(sync_on_startup: bool = True) -> AsyncIOScheduler:
             _job_maintenance,
             trigger=CronTrigger.from_crontab("0 3 * * *"),
             id="system-maintenance",
+            replace_existing=True,
+        )
+
+        scheduler.add_job(
+            _job_device_keepalive,
+            trigger=CronTrigger.from_crontab("30 3 * * *"),
+            id="system-device-keepalive",
             replace_existing=True,
         )
 

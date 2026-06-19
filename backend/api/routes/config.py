@@ -366,6 +366,8 @@ class GlobalSettingsRequest(BaseModel):
     data_dir: Optional[str] = None
     global_proxy: Optional[str] = None
     tg_global_concurrency: Optional[int] = None
+    device_keepalive_enabled: bool = True
+    device_keepalive_interval_days: int = 30
     telegram_bot_notify_enabled: bool = False
     telegram_bot_login_notify_enabled: bool = False
     telegram_bot_task_failure_enabled: bool = True
@@ -380,6 +382,8 @@ class GlobalSettingsResponse(BaseModel):
     data_dir: Optional[str] = None
     global_proxy: Optional[str] = None
     tg_global_concurrency: Optional[int] = 1
+    device_keepalive_enabled: bool = True
+    device_keepalive_interval_days: int = 30
     telegram_bot_notify_enabled: bool = False
     telegram_bot_login_notify_enabled: bool = False
     telegram_bot_task_failure_enabled: bool = True
@@ -410,6 +414,10 @@ async def save_global_settings(
             "log_retention_days": request.log_retention_days,
             "global_proxy": request.global_proxy,
             "tg_global_concurrency": request.tg_global_concurrency,
+            "device_keepalive_enabled": request.device_keepalive_enabled,
+            "device_keepalive_interval_days": max(
+                1, min(int(request.device_keepalive_interval_days or 30), 170)
+            ),
             "telegram_bot_notify_enabled": request.telegram_bot_notify_enabled,
             "telegram_bot_login_notify_enabled": request.telegram_bot_login_notify_enabled,
             "telegram_bot_task_failure_enabled": request.telegram_bot_task_failure_enabled,
@@ -432,6 +440,32 @@ async def save_global_settings(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to save global settings: {str(e)}",
+        )
+
+
+class DeviceKeepaliveResponse(BaseModel):
+    success: bool
+    enabled: bool = True
+    checked: int = 0
+    kept_alive: int = 0
+    skipped: int = 0
+    failed: int = 0
+    interval_days: Optional[int] = None
+    results: list[dict] = []
+
+
+@router.post("/settings/device-keepalive/run", response_model=DeviceKeepaliveResponse)
+async def run_device_keepalive(current_user: User = Depends(get_current_user)):
+    """立即执行一次设备保活。"""
+    try:
+        from backend.services.device_keepalive import get_device_keepalive_service
+
+        result = await get_device_keepalive_service().run_due(force=True)
+        return DeviceKeepaliveResponse(**result)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"设备保活失败: {str(e)}",
         )
 
 
