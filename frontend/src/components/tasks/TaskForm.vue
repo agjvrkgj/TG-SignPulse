@@ -72,7 +72,7 @@ const loadAccounts = async () => {
         } else if (chat.actions) parseActions(chat.actions)
       }
     } else {
-      if (accounts.value.length > 0) { allAccountsMode.value = true; selectedAccounts.value = accounts.value.map(a => a.name); selectedAccount.value = selectedAccounts.value[0] || '' }
+      if (accounts.value.length > 0) { allAccountsMode.value = false; selectedAccounts.value = [accounts.value[0].name]; selectedAccount.value = selectedAccounts.value[0] || '' }
     }
     if (selectedAccount.value) loadChats(selectedAccount.value)
   } catch (e) { console.error(e) }
